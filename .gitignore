@@ -1,0 +1,13 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# kind-generated kubeconfig (contains cluster credentials)
+kubeconfig*.yaml
+.kube/
+
+# OS
+.DS_Store

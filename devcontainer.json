@@ -1,0 +1,40 @@
+{
+  "name": "k3s-platform-dev",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    // Docker-in-Docker: lets kind create its node containers inside the
+    // Codespace itself — this is what makes running a Kubernetes cluster
+    // in a browser tab possible at all.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "latest",
+      "minikube": "none"
+    }
+  },
+
+  // kind isn't packaged as a devcontainer "feature", so install its binary
+  // directly once the container is built.
+  "postCreateCommand": "curl -Lo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64 && chmod +x /usr/local/bin/kind && kind version",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.terraform",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+      ]
+    }
+  }
+
+  // No hostRequirements minimum set deliberately — the default 2-core
+  // machine uses your 120 free core-hours/month at the slowest rate
+  // (60 real hours). A 3-node kind cluster runs fine on 2 cores for demo
+  // purposes; bump to a 4-core machine at creation time only if it feels
+  // sluggish, understanding that halves your free real-time hours.
+}
