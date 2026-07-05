@@ -1,7 +1,7 @@
 # Local Kubernetes Platform — Terraform-Provisioned, Zero Cost, Zero Signup Friction
 
 A genuine multi-node Kubernetes cluster (control-plane + 2 workers), fully
-provisioned by Terraform, running entirely on your own machine via
+provisioned by Terraform, running entirely on your own machine or in a free GitHub Codespace via
 [kind](https://kind.sigs.k8s.io/) (Kubernetes-in-Docker). No cloud account,
 no card verification, no free-tier ceiling — $0, guaranteed, forever.
 
@@ -70,6 +70,10 @@ entirely and instead use **GitHub Codespaces**:
 4. You now have a full Linux terminal, right in your browser tab, with
    everything needed already installed. Run the same commands from
    "Setup" below directly in that terminal.
+
+**This is the exact setup used to build, run, and demo this project** —
+the cluster, ArgoCD, and the GitOps workflow were all provisioned and run
+inside a Codespace, not a local machine.
 
 **Free tier**: personal GitHub accounts get **120 core hours/month** —
 about 60 hours of real time on the default 2-core machine, reset monthly.
@@ -171,11 +175,11 @@ Three proof points, in order of how they build on each other:
 *(Add your actual screenshots to `docs/screenshots/` and update the paths
 above to match your filenames.)*
 
-## Path to cloud (when you're ready)
+## Path to cloud
 
 The Terraform structure here is intentionally close to the cloud versions
 already built for this project (see the AWS and GCP designs in the
-portfolio history). Moving to a real cloud account later means swapping:
+portfolio history). Moving to a real cloud account means swapping:
 
 - `kind_cluster` → the cloud provider's compute/Kubernetes resources
 - `provider.tf`'s kind-generated credentials → the cloud provider's IAM/
@@ -184,8 +188,8 @@ portfolio history). Moving to a real cloud account later means swapping:
 
 Everything else — the Helm releases for ArgoCD/monitoring, the Kubernetes
 manifests, the GitOps workflow — carries over unchanged. That portability
-is itself worth stating explicitly in interviews: the platform layer was
-designed cloud-agnostically from the start.
+is a deliberate design choice: the platform layer was built
+cloud-agnostically from the start.
 
 ## What I'd do differently at scale
 
