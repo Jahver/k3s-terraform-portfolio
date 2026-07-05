@@ -161,11 +161,12 @@ Three proof points, in order of how they build on each other:
    to prove the mechanism works:
    ![argocd guestbook](docs/screenshots/argocd-guestbook-tree.png)
 
-3. **A custom app, in `gitops-app/`, deployed and *updated* purely via Git.**
-   Editing the app's ConfigMap and pushing to `main` caused ArgoCD to detect
-   the change and redeploy automatically — no cluster commands run by hand:
-   ![before](docs/screenshots/hello-app-v1.png)
-   ![after](docs/screenshots/hello-app-v2.png)
+3. **A custom app, in this repo's `gitops-app/` folder, deployed and
+   updated purely via Git.** Editing the app's ConfigMap and pushing to
+   `main` caused ArgoCD to detect the change and redeploy automatically —
+   no cluster commands run by hand. This is the live result, rendering
+   the exact text from the pushed commit:
+   ![hello-app live](docs/screenshots/hello-app-v2.png)
 
 *(Add your actual screenshots to `docs/screenshots/` and update the paths
 above to match your filenames.)*
