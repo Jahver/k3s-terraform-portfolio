@@ -138,13 +138,37 @@ local-k3s-platform/
 ## Status / Roadmap
 
 - [x] Multi-node Kubernetes cluster via Terraform, zero cost, zero signup
-- [ ] ArgoCD via Helm, GitOps app-of-apps pattern
+- [x] ArgoCD installed via Terraform/Helm
+- [x] GitOps auto-sync proven end-to-end: a custom app, in this repo's
+      `gitops-app/` folder, is watched by ArgoCD and deploys automatically
+      on every `git push` — no manual `kubectl apply` involved
 - [ ] Prometheus + Grafana — no resource ceiling here, so the full stack fits
 - [ ] Ingress via NGINX (kind supports port-mapping straight to your
       machine's localhost, no cloud load balancer needed)
 - [ ] `docs/path-to-cloud.md` — a short doc mapping each local resource to
       its cloud equivalent (kind node → EC2/Compute instance, local
       networking → VPC/VCN), demonstrating the design translates directly
+
+## What's live right now
+
+Three proof points, in order of how they build on each other:
+
+1. **A real 3-node Kubernetes cluster**, entirely from `terraform apply`:
+   ![cluster nodes](docs/screenshots/nodes-ready.png)
+
+2. **ArgoCD running as the GitOps controller**, syncing an app from
+   [Argo's own example repo](https://github.com/argoproj/argocd-example-apps)
+   to prove the mechanism works:
+   ![argocd guestbook](docs/screenshots/argocd-guestbook-tree.png)
+
+3. **A custom app, in `gitops-app/`, deployed and *updated* purely via Git.**
+   Editing the app's ConfigMap and pushing to `main` caused ArgoCD to detect
+   the change and redeploy automatically — no cluster commands run by hand:
+   ![before](docs/screenshots/hello-app-v1.png)
+   ![after](docs/screenshots/hello-app-v2.png)
+
+*(Add your actual screenshots to `docs/screenshots/` and update the paths
+above to match your filenames.)*
 
 ## Path to cloud (when you're ready)
 
