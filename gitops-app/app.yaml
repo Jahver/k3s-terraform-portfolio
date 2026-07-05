@@ -6,12 +6,16 @@ metadata:
 data:
   index.html: |
     <html>
-      <head><title>Jeremiah's GitOps Demo</title></head>
+      <head>
+        <meta charset="UTF-8">
+        <title>Jeremiah's GitOps Demo</title>
+      </head>
       <body style="font-family: sans-serif; text-align: center; margin-top: 100px;">
         <h1>Deployed via GitOps 🚀</h1>
-        <p>Version: v1 — edit this text, push to GitHub, and watch it update automatically.</p>
+        <p>Version: v2 — pushed straight from GitHub, deployed automatically by ArgoCD.</p>
       </body>
     </html>
+
 ---
 apiVersion: apps/v1
 kind: Deployment
