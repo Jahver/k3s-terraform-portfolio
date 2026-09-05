@@ -12,3 +12,8 @@ kubeconfig*.yaml
 # OS
 .DS_Store
 k3s-platform-dev-config
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
