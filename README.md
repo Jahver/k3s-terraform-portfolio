@@ -146,12 +146,16 @@ local-k3s-platform/
 - [x] GitOps auto-sync proven end-to-end: a custom app, in this repo's
       `gitops-app/` folder, is watched by ArgoCD and deploys automatically
       on every `git push` — no manual `kubectl apply` involved
-- [ ] Prometheus + Grafana — no resource ceiling here, so the full stack fits
-- [ ] Ingress via NGINX (kind supports port-mapping straight to your
-      machine's localhost, no cloud load balancer needed)
-- [ ] `docs/path-to-cloud.md` — a short doc mapping each local resource to
-      its cloud equivalent (kind node → EC2/Compute instance, local
-      networking → VPC/VCN), demonstrating the design translates directly
+- [x] Monitoring: kube-prometheus-stack (Prometheus + Grafana +
+      node-exporter + kube-state-metrics) via Terraform/Helm, tuned down
+      for a local demo cluster (no Alertmanager, modest resource requests)
+- [x] `docs/provider-journey.md` — the honest account of the AWS →
+      Oracle → GCP → local path this project actually took
+- [ ] **Ingress: deliberately descoped.** Kind's port-forwarding already
+      covers every access need this project has (ArgoCD, Grafana, the demo
+      app) without adding an ingress controller's complexity for no real
+      benefit at this scale. Revisit only if this ever needs
+      simultaneous multi-service routing under one hostname.
 
 ## What's live right now
 
@@ -171,6 +175,12 @@ Three proof points, in order of how they build on each other:
    no cluster commands run by hand. This is the live result, rendering
    the exact text from the pushed commit:
    ![hello-app live](docs/screenshots/hello-app-v2.png)
+
+4. **Live monitoring via Prometheus + Grafana**, pulling real metrics off
+   the actual 3-node cluster — CPU/memory utilization broken down by
+   namespace (you can see `argocd`, `hello-app`, `monitoring`, etc. as
+   separate series), not a mockup:
+   ![grafana dashboard](docs/screenshots/grafana-dashboard.png)
 
 *(Add your actual screenshots to `docs/screenshots/` and update the paths
 above to match your filenames.)*
