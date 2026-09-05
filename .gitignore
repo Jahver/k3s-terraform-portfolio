@@ -11,3 +11,4 @@ kubeconfig*.yaml
 
 # OS
 .DS_Store
+k3s-platform-dev-config
