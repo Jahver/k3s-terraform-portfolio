@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: task-api
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Jahver/k3s-terraform-portfolio.git
+    targetRevision: main
+    path: ci-cd-pipeline/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: task-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
