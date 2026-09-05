@@ -14,7 +14,7 @@ def health():
 
 @app.get("/")
 def index():
-    return jsonify(service="task-api", version=os.environ.get("APP_VERSION", "dev"))
+    return jsonify(service="task-api", version="v2")
 
 
 @app.get("/api/tasks")
