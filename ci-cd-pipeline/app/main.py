@@ -14,7 +14,7 @@ def health():
 
 @app.get("/")
 def index():
-    return jsonify(service="task-api", version="v2")
+    return jsonify(service="task-api", version="v3")
 
 
 @app.get("/api/tasks")
