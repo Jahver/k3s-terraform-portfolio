@@ -10,25 +10,39 @@ on:
     branches: [main]
     paths:
       - "ci-cd-pipeline/**"
+      - ".github/workflows/ci-cd-pipeline.yml"
 
-permissions:
-  contents: read
-  packages: write
+# Deny everything by default. Each job below asks only for what it needs.
+permissions: {}
+
+# A newer push to the same ref cancels an old pull request run.
+# Runs on main are never cancelled, so a publish cannot be cut off half way.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE_NAME: ghcr.io/jahver/task-api
 
+# Every third-party action is pinned to a full commit SHA, with its version in a
+# comment. Tags can be moved to malicious code (as happened to trivy-action in
+# March 2026); a commit SHA cannot. Dependabot proposes SHA bumps as pull requests.
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: ci-cd-pipeline/app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -43,22 +57,33 @@ jobs:
   build-scan-push:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # used only by the push steps, which run on main
+    outputs:
+      # Immutable digest of the pushed image. Signing and attestation use this,
+      # never a tag, so they always refer to exactly what was scanned and pushed.
+      digest: ${{ steps.push.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build image (loaded locally for scanning, not pushed yet)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ci-cd-pipeline/app
           tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           push: false
           load: true
 
+      # 0.35.0 is the version named safe in the March 2026 advisory GHSA-69fq-xp46-6x23.
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
@@ -66,17 +91,94 @@ jobs:
           ignore-unfixed: true
           severity: "CRITICAL,HIGH"
 
+      # Publishing happens only for pushes to main, never for pull requests,
+      # and only after the scan above has passed.
       - name: Log in to GitHub Container Registry
-        if: success()
-        uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Tag and push (only runs if the scan above passed)
-        if: success()
+      # Only the commit SHA tag is pushed. A moving :latest tag hid changes from
+      # ArgoCD before, so the manifest always points at an immutable SHA tag.
+      - name: Push image (commit SHA tag only)
+        id: push
+        if: github.event_name == 'push'
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
-          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.IMAGE_NAME }}:latest
-          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.IMAGE_NAME }}:latest
+          docker push "$IMAGE_TAG"
+          repo_digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE_TAG")"
+          echo "digest=${repo_digest##*@}" >> "$GITHUB_OUTPUT"
+
+  # Runs only for pushes to main, after the image is scanned and pushed.
+  # Kept as its own job so the build job never holds id-token or attestation
+  # permissions: only this job can mint a signing identity.
+  sign-and-attest:
+    name: Sign image and attest SBOM and provenance
+    needs: build-scan-push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write # push the signature and attestations next to the image
+      id-token: write # keyless signing with this workflow's GitHub OIDC identity
+      attestations: write # record the attestations for the repository
+    env:
+      DIGEST: ${{ needs.build-scan-push.outputs.digest }}
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Keyless: no private key exists to leak. The signature is bound to this
+      # workflow's identity and recorded in the public Rekor transparency log.
+      - name: Sign image by digest
+        run: cosign sign --yes "${IMAGE_NAME}@${DIGEST}"
+
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ${{ env.IMAGE_NAME }}@${{ env.DIGEST }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: true
+          upload-release-assets: false
+
+      # actions/attest makes an SBOM attestation when sbom-path is given, and
+      # SLSA build provenance when it is not. attest-sbom and
+      # attest-build-provenance are deprecated wrappers around this same action.
+      - name: Attest SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ env.DIGEST }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
+
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ env.DIGEST }}
+          push-to-registry: true
+
+      # Prove the signature verifies against this workflow's identity, exactly
+      # the check the cluster policy will make later.
+      - name: Verify signature
+        run: |
+          cosign verify \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci-cd-pipeline.yml@${GITHUB_REF}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${IMAGE_NAME}@${DIGEST}"
