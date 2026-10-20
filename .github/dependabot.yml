@@ -1,0 +1,29 @@
+version: 2
+
+# Dependabot keeps the pinned SHAs and dependencies current. The cooldown means a
+# brand-new release is not proposed until it has been public for a week, which
+# gives the community time to spot a malicious release before it reaches this repo.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "pip"
+    directory: "/ci-cd-pipeline/app"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "docker"
+    directory: "/ci-cd-pipeline/app"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
