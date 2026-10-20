@@ -1,12 +1,12 @@
 # --- Build stage: install dependencies ---
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # --- Final stage: minimal runtime image ---
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Run as a non-root user — a real security expectation, not a formality;
 # Trivy and most container security scanners flag root-user images.
