@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "ci-cd-pipeline/**"
+      # Merging a manifest bump must not start another build, or the
+      # update-manifest job would open a new bump PR forever.
+      - "!ci-cd-pipeline/k8s/**"
       - ".github/workflows/ci-cd-pipeline.yml"
   pull_request:
     branches: [main]
@@ -182,3 +185,49 @@ jobs:
             --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci-cd-pipeline.yml@${GITHUB_REF}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "${IMAGE_NAME}@${DIGEST}"
+
+  # Opens a pull request that points the Rollout at the image just signed.
+  # A person reviews and merges it; ArgoCD then deploys it. CI never touches
+  # the cluster and never commits straight to main.
+  update-manifest:
+    name: Open pull request to bump image in rollout.yaml
+    needs: [build-scan-push, sign-and-attest]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the bump branch
+      pull-requests: write # open the pull request
+    env:
+      DIGEST: ${{ needs.build-scan-push.outputs.digest }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Update image in rollout.yaml and open pull request
+        run: |
+          set -euo pipefail
+
+          # Refuse anything that is not a plain sha256 digest before using it.
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "bad digest: $DIGEST"; exit 1; }
+
+          file=ci-cd-pipeline/k8s/rollout.yaml
+          new_image="${IMAGE_NAME}:${GITHUB_SHA}@${DIGEST}"
+          branch="deploy/bump-${GITHUB_SHA:0:12}"
+
+          sed -i "s|image: ${IMAGE_NAME}:.*|image: ${new_image}|" "$file"
+          grep -q "image: ${new_image}$" "$file" || { echo "image line not updated"; exit 1; }
+          if git diff --quiet; then echo "manifest already up to date"; exit 0; fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -am "Deploy ${GITHUB_SHA:0:12}: pin rollout to signed image digest"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+
+          gh pr create \
+            --base main --head "$branch" \
+            --title "Deploy ${GITHUB_SHA:0:12}" \
+            --body "Automated bump. Image: \`${new_image}\`. Signed and attested by run ${GITHUB_RUN_ID}. Merge to let ArgoCD roll it out as a canary."
