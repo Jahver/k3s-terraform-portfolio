@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: task-api
-          image: ghcr.io/jahver/task-api:88f6aefe29fe3027550ec3ca5f2859d5ef4ca83f
+          image: ghcr.io/jahver/task-api:f6b9246bb59fd4b61444862b71d53160384dd3c4@sha256:6c86ddc3567d67003f9179f8bbd660818e51033e0af95352ae2ffcdf0b5f1c2b
           ports:
             - containerPort: 3000
           readinessProbe:
