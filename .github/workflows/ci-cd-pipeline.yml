@@ -32,10 +32,17 @@ env:
 # March 2026); a commit SHA cannot. Dependabot proposes SHA bumps as pull requests.
 jobs:
   test:
+    name: test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is what runs today. 3.14 is what the Dockerfile base image is
+        # moving to, so the tests must pass there before that bump is merged.
+        python-version: ["3.12", "3.14"]
     defaults:
       run:
         working-directory: ci-cd-pipeline/app
@@ -47,7 +54,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
           cache-dependency-path: ci-cd-pipeline/app/requirements-dev.txt
 
@@ -225,7 +232,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git commit -am "Deploy ${GITHUB_SHA:0:12}: pin rollout to signed image digest"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+          # Force is safe: this branch is owned by the bot and holds only the bump.
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
 
           gh pr create \
             --base main --head "$branch" \
