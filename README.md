@@ -123,6 +123,28 @@ terraform apply     # rebuilds from scratch in under a minute
 Fast enough to do this repeatedly while iterating — a real advantage over
 waiting on cloud provisioning.
 
+### Rebuild everything with one command
+
+`terraform apply` creates the cluster, ArgoCD, Argo Rollouts and monitoring.
+The ArgoCD applications are the one manual step, so a script does both:
+
+```bash
+./scripts/rebuild.sh
+```
+
+It waits for the nodes and ArgoCD, registers the apps (`guestbook`,
+`hello-app`, `task-api`) and waits until `task-api` is synced and healthy.
+Codespaces are deleted after a period of inactivity, and the cluster goes
+with them, so this is how the platform is brought back.
+
+Notes:
+- The `task-api` image is pulled from `ghcr.io/jahver/task-api`. If that
+  package is private, the pods will show `ImagePullBackOff` until the package
+  is made public or an image pull secret is added.
+- Grafana uses a fixed demo password in `monitoring.tf`. That is acceptable
+  for a throwaway local cluster, and not for anything reachable from the
+  internet.
+
 ## Repo structure
 
 ```
