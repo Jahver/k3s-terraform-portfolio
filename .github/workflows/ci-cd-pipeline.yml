@@ -103,6 +103,21 @@ jobs:
 
       # Publishing happens only for pushes to main, never for pull requests,
       # and only after the scan above has passed.
+      # The unit tests never start gunicorn, so start the real image and call it.
+      # Runs before any push, so a broken image is never published.
+      - name: Smoke test image
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: |
+          docker run -d --name smoke -p 3000:3000 "$IMAGE_TAG"
+          ok=0
+          for _ in $(seq 1 15); do
+            if curl -fsS http://localhost:3000/health; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "$ok" != 1 ]; then docker logs smoke; exit 1; fi
+          docker rm -f smoke
+
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
