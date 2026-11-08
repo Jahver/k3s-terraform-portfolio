@@ -7,7 +7,7 @@ resource "helm_release" "kyverno" {
   version          = "~> 3.9"
   namespace        = "kyverno"
   create_namespace = true
-  timeout          = 600
+  timeout          = 900
 
   # Only the admission controller is needed to verify images. The cleanup and
   # reports controllers are switched off to save CPU and memory on a small
