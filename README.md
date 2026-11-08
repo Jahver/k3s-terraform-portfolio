@@ -132,8 +132,9 @@ The ArgoCD applications are the one manual step, so a script does both:
 ./scripts/rebuild.sh
 ```
 
-It waits for the nodes and ArgoCD, registers the apps (`guestbook`,
-`hello-app`, `task-api`) and waits until `task-api` is synced and healthy.
+It waits for the nodes and ArgoCD, registers the image signature policy
+first, then the apps (`guestbook`, `hello-app`, `task-api`), and waits until
+`task-api` is synced and healthy.
 Codespaces are deleted after a period of inactivity, and the cluster goes
 with them, so this is how the platform is brought back.
 
@@ -144,6 +145,33 @@ Notes:
 - Grafana uses a fixed demo password in `monitoring.tf`. That is acceptable
   for a throwaway local cluster, and not for anything reachable from the
   internet.
+
+### Only signed images run
+
+Kyverno refuses any `task-api` pod whose image was not signed by this
+repository's CI workflow on `main`. The policy is
+[`policies/verify-task-api-signature.yaml`](policies/verify-task-api-signature.yaml),
+and the identity it checks is the one the pipeline's own `Verify signature`
+step checks. It also requires the image to be referenced by digest.
+
+Check it on a running cluster:
+
+```bash
+# Allowed: the current rollout runs, so its signed image was admitted.
+kubectl -n task-api get rollout
+
+# Refused: an older image from before signing was added, referenced by digest.
+D=$(docker buildx imagetools inspect \
+  ghcr.io/jahver/task-api:88f6aefe29fe3027550ec3ca5f2859d5ef4ca83f \
+  --format '{{.Manifest.Digest}}')
+kubectl -n task-api run unsigned-test --image="ghcr.io/jahver/task-api@$D"
+# Expect: admission webhook denied the request ... must be signed by this
+# repository's CI workflow on main
+```
+
+What it does not check yet: the SBOM and provenance attestations. It also
+needs the `task-api` package to be public, so the cluster can read the
+signature from GHCR.
 
 ## Repo structure
 
