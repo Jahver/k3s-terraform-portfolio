@@ -18,6 +18,19 @@ echo "==> Waiting for nodes and ArgoCD"
 kubectl wait --for=condition=Ready nodes --all --timeout=300s
 kubectl -n argocd rollout status deploy/argocd-server --timeout=300s
 
+echo "==> Waiting for Kyverno"
+kubectl -n kyverno rollout status deploy/kyverno-admission-controller --timeout=300s
+
+# The signature policy goes in first, so task-api pods are checked from their
+# very first admission.
+echo "==> Registering the image signature policy"
+kubectl apply -f "$repo_root/kyverno-policies-argocd.yaml"
+sleep 10
+kubectl -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced \
+  application/kyverno-policies --timeout=300s
+kubectl wait --for=jsonpath='{.status.conditionStatus.ready}'=true \
+  imagevalidatingpolicy/task-api-signed-by-ci --timeout=180s
+
 echo "==> Registering ArgoCD applications"
 kubectl apply \
   -f guestbook-app.yaml \

@@ -1,0 +1,46 @@
+# Admit task-api pods only if their image is signed by this repository's CI
+# workflow on main. The identity is the one the pipeline's own "Verify
+# signature" step already checks, so a pass in CI means a pass here.
+apiVersion: policies.kyverno.io/v1beta1
+kind: ImageValidatingPolicy
+metadata:
+  name: task-api-signed-by-ci
+spec:
+  webhookConfiguration:
+    timeoutSeconds: 30
+  # Fail closed: if the check cannot run, the pod is refused. The scope below
+  # keeps that to the task-api namespace, so a Kyverno outage cannot block
+  # the rest of the cluster.
+  failurePolicy: Fail
+  validationActions:
+    - Deny
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: task-api
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchImageReferences:
+    - glob: ghcr.io/jahver/task-api*
+  validationConfigurations:
+    # The manifest already pins tag@digest, so nothing needs rewriting.
+    mutateDigest: false
+    # Refuse an image referenced by tag alone. A tag can be re-pointed.
+    verifyDigest: true
+    required: true
+  attestors:
+    - name: ci
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/Jahver/k3s-terraform-portfolio/.github/workflows/ci-cd-pipeline.yml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+  validations:
+    - expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.ci])).all(e, e > 0)
+      message: image must be signed by this repository's CI workflow on main
