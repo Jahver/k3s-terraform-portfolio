@@ -9,11 +9,10 @@ on:
       # update-manifest job would open a new bump PR forever.
       - "!ci-cd-pipeline/k8s/**"
       - ".github/workflows/ci-cd-pipeline.yml"
+  # No paths filter on pull requests: branch protection requires these checks,
+  # and a required check that never runs would block docs-only pull requests.
   pull_request:
     branches: [main]
-    paths:
-      - "ci-cd-pipeline/**"
-      - ".github/workflows/ci-cd-pipeline.yml"
 
 # Deny everything by default. Each job below asks only for what it needs.
 permissions: {}
